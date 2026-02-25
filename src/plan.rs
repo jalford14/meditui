@@ -4,6 +4,7 @@ use chrono::Datelike;
 pub struct ChapterRef {
     pub book: String,
     pub chapter: u16,
+    pub track: String,
 }
 
 pub struct Plan {
