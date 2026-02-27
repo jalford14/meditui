@@ -36,7 +36,7 @@ fn main() -> io::Result<()> {
 
     // Main loop
     loop {
-        let visible_lines = terminal.get_frame().area().height.saturating_sub(4) as usize;
+        let visible_lines = terminal.get_frame().area().height.saturating_sub(2) as usize;
 
         terminal.draw(|f| ui::draw(f, &mut app))?;
 

@@ -3,6 +3,12 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use crate::app::{App, Mode};
 
 pub fn handle_key(app: &mut App, key: KeyEvent, visible_lines: usize) {
+    // Any key dismisses help overlay
+    if app.show_help {
+        app.show_help = false;
+        return;
+    }
+
     // Handle pending g first
     if app.pending_g {
         app.pending_g = false;
@@ -43,6 +49,7 @@ fn handle_normal(app: &mut App, key: KeyEvent, visible_lines: usize) {
         KeyCode::Char('v') => app.enter_visual(),
         KeyCode::Enter => app.toggle_highlight(),
         KeyCode::Char('t') => app.cycle_theme(),
+        KeyCode::Char('?') => app.toggle_help(),
 
         _ => {}
     }
@@ -57,6 +64,7 @@ fn handle_visual(app: &mut App, key: KeyEvent) {
         KeyCode::Char('d') => app.unhighlight_selection(),
 
         KeyCode::Esc => app.cancel_visual(),
+        KeyCode::Char('?') => app.toggle_help(),
 
         _ => {}
     }

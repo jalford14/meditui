@@ -25,6 +25,7 @@ pub struct App {
     pub date_string: String,
     pub should_quit: bool,
     pub theme: Theme,
+    pub show_help: bool,
 }
 
 impl App {
@@ -49,12 +50,17 @@ impl App {
             date_string,
             should_quit: false,
             theme,
+            show_help: false,
         }
     }
 
     pub fn cycle_theme(&mut self) {
         self.theme = self.theme.cycle();
         self.theme.save();
+    }
+
+    pub fn toggle_help(&mut self) {
+        self.show_help = !self.show_help;
     }
 
     pub fn active_chapter(&self) -> Option<&ChapterRef> {
