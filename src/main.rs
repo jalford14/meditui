@@ -3,6 +3,7 @@ mod bible;
 mod highlight;
 mod keys;
 mod plan;
+mod theme;
 mod ui;
 
 use std::io;

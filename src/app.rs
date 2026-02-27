@@ -1,6 +1,7 @@
 use crate::bible::Bible;
 use crate::highlight::Highlights;
 use crate::plan::{ChapterRef, Plan};
+use crate::theme::Theme;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
@@ -23,6 +24,7 @@ pub struct App {
     pub day: u16,
     pub date_string: String,
     pub should_quit: bool,
+    pub theme: Theme,
 }
 
 impl App {
@@ -30,6 +32,7 @@ impl App {
         let day = crate::plan::day_of_year();
         let date_string = crate::plan::today_date_string();
         let today_chapters = plan.chapters_for_day(day);
+        let theme = Theme::load();
 
         App {
             bible,
@@ -45,7 +48,13 @@ impl App {
             day,
             date_string,
             should_quit: false,
+            theme,
         }
+    }
+
+    pub fn cycle_theme(&mut self) {
+        self.theme = self.theme.cycle();
+        self.theme.save();
     }
 
     pub fn active_chapter(&self) -> Option<&ChapterRef> {

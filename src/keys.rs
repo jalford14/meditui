@@ -42,6 +42,7 @@ fn handle_normal(app: &mut App, key: KeyEvent, visible_lines: usize) {
 
         KeyCode::Char('v') => app.enter_visual(),
         KeyCode::Enter => app.toggle_highlight(),
+        KeyCode::Char('t') => app.cycle_theme(),
 
         _ => {}
     }

@@ -1,13 +1,19 @@
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::Style;
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Paragraph, Tabs, Wrap};
+use ratatui::widgets::{Block, Borders, Clear, Paragraph, Tabs, Wrap};
 use ratatui::Frame;
 
 use crate::app::{App, Mode};
 
 pub fn draw(f: &mut Frame, app: &mut App) {
     let area = f.area();
+    let theme = app.theme;
+
+    // Fill entire background with theme color
+    let bg_block = Block::default().style(Style::default().bg(theme.bg()));
+    f.render_widget(Clear, area);
+    f.render_widget(bg_block, area);
 
     let chunks = Layout::vertical([
         Constraint::Length(1), // top bar
@@ -26,20 +32,17 @@ pub fn draw(f: &mut Frame, app: &mut App) {
 }
 
 fn draw_top_bar(f: &mut Frame, app: &App, area: Rect) {
+    let theme = app.theme;
     let text = format!(
         "  McHeyne Day {} — {}   Family | Secret",
         app.day, app.date_string
     );
-    let bar = Paragraph::new(text).style(
-        Style::default()
-            .fg(Color::Black)
-            .bg(Color::White)
-            .add_modifier(Modifier::BOLD),
-    );
+    let bar = Paragraph::new(text).style(theme.top_bar_style());
     f.render_widget(bar, area);
 }
 
 fn draw_chapter_tabs(f: &mut Frame, app: &App, area: Rect) {
+    let theme = app.theme;
     let titles: Vec<Line> = app
         .today_chapters
         .iter()
@@ -48,13 +51,14 @@ fn draw_chapter_tabs(f: &mut Frame, app: &App, area: Rect) {
 
     let tabs = Tabs::new(titles)
         .select(app.active_chapter_idx)
-        .highlight_style(
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        )
+        .style(theme.tab_normal_style())
+        .highlight_style(theme.tab_highlight_style())
         .divider("|")
-        .block(Block::default().borders(Borders::BOTTOM));
+        .block(
+            Block::default()
+                .borders(Borders::BOTTOM)
+                .border_style(theme.tab_border_style()),
+        );
 
     f.render_widget(tabs, area);
 }
@@ -76,6 +80,8 @@ fn wrapped_line_count(text: &str, width: u16) -> usize {
 }
 
 fn draw_verses(f: &mut Frame, app: &mut App, area: Rect) {
+    let theme = app.theme;
+
     let Some(ch_ref) = app.active_chapter() else {
         let msg = Paragraph::new("No readings for today.");
         f.render_widget(msg, area);
@@ -153,9 +159,7 @@ fn draw_verses(f: &mut Frame, app: &mut App, area: Rect) {
     // Chapter title
     lines.push(Line::from(Span::styled(
         format!("{} {}", ch_book, ch_chapter),
-        Style::default()
-            .fg(Color::White)
-            .add_modifier(Modifier::BOLD),
+        theme.chapter_title_style(),
     )));
     lines.push(Line::from(""));
 
@@ -170,25 +174,17 @@ fn draw_verses(f: &mut Frame, app: &mut App, area: Rect) {
         let verse_text = format!("{}{:>3}  {}", indicator, verse.number, verse.text);
 
         let style = if is_visual && is_cursor {
-            Style::default()
-                .fg(Color::White)
-                .bg(Color::Blue)
-                .add_modifier(Modifier::BOLD)
+            theme.verse_visual_cursor()
         } else if is_visual {
-            Style::default().fg(Color::White).bg(Color::Blue)
+            theme.verse_visual()
         } else if is_cursor && is_highlighted {
-            Style::default()
-                .fg(Color::Black)
-                .bg(Color::Yellow)
-                .add_modifier(Modifier::BOLD)
+            theme.verse_cursor_highlighted()
         } else if is_cursor {
-            Style::default()
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD)
+            theme.verse_cursor()
         } else if is_highlighted {
-            Style::default().fg(Color::Black).bg(Color::Yellow)
+            theme.verse_highlighted()
         } else {
-            Style::default().fg(Color::Gray)
+            theme.verse_normal()
         };
 
         lines.push(Line::from(Span::styled(verse_text, style)));
@@ -202,6 +198,8 @@ fn draw_verses(f: &mut Frame, app: &mut App, area: Rect) {
 }
 
 fn draw_status_bar(f: &mut Frame, app: &App, area: Rect) {
+    let theme = app.theme;
+
     let mode_str = match app.mode {
         Mode::Normal => "NORMAL",
         Mode::Visual => "VISUAL",
@@ -220,17 +218,19 @@ fn draw_status_bar(f: &mut Frame, app: &App, area: Rect) {
 
     let pending = if app.pending_g { " g.." } else { "" };
 
-    let text = format!(" {} | {}{}", mode_str, ch_info, pending);
-    let bar = Paragraph::new(text).style(Style::default().fg(Color::White).bg(Color::DarkGray));
+    let text = format!(" {} | {} | {}{}", mode_str, ch_info, theme.label(), pending);
+    let bar = Paragraph::new(text).style(theme.status_bar_style());
     f.render_widget(bar, area);
 }
 
 fn draw_help_bar(f: &mut Frame, app: &App, area: Rect) {
+    let theme = app.theme;
+
     let help = match app.mode {
-        Mode::Normal => " j/k:move  h/l:chapter  v:select  Enter:highlight  gg/G:top/end  Ctrl-d/u:page  q:quit",
+        Mode::Normal => " j/k:move  h/l:chapter  v:select  Enter:highlight  t:theme  gg/G:top/end  Ctrl-d/u:page  q:quit",
         Mode::Visual => " j/k:extend  y:highlight  d:remove  Esc:cancel",
     };
 
-    let bar = Paragraph::new(help).style(Style::default().fg(Color::DarkGray).bg(Color::Black));
+    let bar = Paragraph::new(help).style(theme.help_bar_style());
     f.render_widget(bar, area);
 }
