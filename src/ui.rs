@@ -1,9 +1,10 @@
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::Style;
+use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Borders, Clear, Paragraph};
 use ratatui::Frame;
 
+use crate::animation::lerp_color;
 use crate::app::{App, Mode};
 
 pub fn draw(f: &mut Frame, app: &mut App) {
@@ -149,6 +150,31 @@ fn build_verse_lines(
     lines
 }
 
+/// Apply fade effect to a style's foreground color (lerp toward bg)
+fn fade_style(style: Style, bg_color: Color, fade: f32) -> Style {
+    if fade >= 1.0 {
+        return style;
+    }
+    if let Some(fg) = style.fg {
+        Style { fg: Some(lerp_color(bg_color, fg, fade)), ..style }
+    } else {
+        style
+    }
+}
+
+/// Apply flash brightening to a style's foreground color
+fn flash_style(style: Style, intensity: f32) -> Style {
+    if intensity <= 0.0 {
+        return style;
+    }
+    let bright = Color::Rgb(255, 255, 230);
+    if let Some(fg) = style.fg {
+        Style { fg: Some(lerp_color(fg, bright, intensity * 0.5)), ..style }
+    } else {
+        style
+    }
+}
+
 fn draw_verses(f: &mut Frame, app: &mut App, area: Rect) {
     let theme = app.theme;
 
@@ -186,18 +212,23 @@ fn draw_verses(f: &mut Frame, app: &mut App, area: Rect) {
         None
     };
 
+    // Animation state
+    let fade = app.anim.fade_progress();
+    let bg_color = theme.bg();
+
     let w = content_width as usize;
     let mut all_lines: Vec<Line<'static>> = Vec::new();
     let mut verse_start: Vec<usize> = Vec::new();
 
-    // Chapter title (centered)
+    // Chapter title (centered, with fade)
     let title = format!("{} {}", ch_book, ch_chapter);
     let title_len = title.chars().count();
     let left_pad = w.saturating_sub(title_len) / 2;
     let right_pad = w.saturating_sub(left_pad + title_len);
+    let title_style = fade_style(theme.chapter_title_style(), bg_color, fade);
     all_lines.push(Line::from(vec![
         Span::styled(" ".repeat(left_pad), theme.bg_style()),
-        Span::styled(title, theme.chapter_title_style()),
+        Span::styled(title, title_style),
         Span::styled(" ".repeat(right_pad), theme.bg_style()),
     ]));
     all_lines.push(Line::from(Span::styled(" ".repeat(w), theme.bg_style())));
@@ -212,8 +243,21 @@ fn draw_verses(f: &mut Frame, app: &mut App, area: Rect) {
                 .is_highlighted(&ch_book, ch_chapter, verse.number);
         let is_visual = visual_range.map_or(false, |(s, e)| idx >= s && idx <= e);
 
-        let (num_style, text_style) =
+        let (mut num_style, mut text_style) =
             theme.verse_styles(is_cursor, is_highlighted, is_visual);
+
+        // Chapter fade-in
+        if fade < 1.0 {
+            num_style = fade_style(num_style, bg_color, fade);
+            text_style = fade_style(text_style, bg_color, fade);
+        }
+
+        // Highlight flash
+        let flash = app.anim.flash_intensity(idx);
+        if flash > 0.0 {
+            num_style = flash_style(num_style, flash);
+            text_style = flash_style(text_style, flash);
+        }
 
         let verse_lines =
             build_verse_lines(verse.number, &verse.text, content_width, num_style, text_style);

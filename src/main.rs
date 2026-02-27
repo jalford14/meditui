@@ -1,3 +1,4 @@
+mod animation;
 mod app;
 mod bible;
 mod highlight;
@@ -40,11 +41,16 @@ fn main() -> io::Result<()> {
 
         terminal.draw(|f| ui::draw(f, &mut app))?;
 
-        if event::poll(Duration::from_millis(100))? {
+        // Faster polling during animations for smooth rendering (~30fps)
+        let poll_ms = if app.anim.is_animating() { 5 } else { 100 };
+
+        if event::poll(Duration::from_millis(poll_ms))? {
             if let Event::Key(key) = event::read()? {
                 keys::handle_key(&mut app, key, visible_lines);
             }
         }
+
+        app.anim.tick();
 
         if app.should_quit {
             break;

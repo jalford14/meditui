@@ -1,3 +1,4 @@
+use crate::animation::AnimationState;
 use crate::bible::Bible;
 use crate::highlight::Highlights;
 use crate::plan::{ChapterRef, Plan};
@@ -26,6 +27,7 @@ pub struct App {
     pub should_quit: bool,
     pub theme: Theme,
     pub show_help: bool,
+    pub anim: AnimationState,
 }
 
 impl App {
@@ -51,6 +53,7 @@ impl App {
             should_quit: false,
             theme,
             show_help: false,
+            anim: AnimationState::new(),
         }
     }
 
@@ -119,6 +122,7 @@ impl App {
             self.cursor_verse = 0;
             self.scroll_offset = 0;
             self.mode = Mode::Normal;
+            self.anim.start_fade();
         }
     }
 
@@ -128,6 +132,7 @@ impl App {
             self.cursor_verse = 0;
             self.scroll_offset = 0;
             self.mode = Mode::Normal;
+            self.anim.start_fade();
         }
     }
 
@@ -182,6 +187,7 @@ impl App {
                 if let Some(verse) = verses.get(self.cursor_verse) {
                     self.highlights.toggle(&ch.book, ch.chapter, verse.number);
                     self.highlights.save();
+                    self.anim.start_flash(self.cursor_verse);
                 }
             }
         }
