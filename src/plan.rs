@@ -4,7 +4,6 @@ use chrono::Datelike;
 pub struct ChapterRef {
     pub book: String,
     pub chapter: u16,
-    pub track: String,
 }
 
 pub struct Plan {
@@ -24,16 +23,12 @@ impl Plan {
 
             let mut chapters = Vec::new();
 
-            // Parts 0,1 are Family track (columns 1,2 of McHeyne)
-            // Parts 2,3 are Secret track (columns 3,4 of McHeyne)
-            for (idx, part) in parts.iter().enumerate() {
-                let track = if idx < 2 { "Family" } else { "Secret" };
+            for part in parts.iter() {
                 let refs = parse_reference(part.trim());
                 for (book, ch) in refs {
                     chapters.push(ChapterRef {
                         book: normalize_book_name(&book),
                         chapter: ch,
-                        track: track.to_string(),
                     });
                 }
             }
