@@ -162,17 +162,21 @@ fn fade_style(style: Style, bg_color: Color, fade: f32) -> Style {
     }
 }
 
-/// Apply flash brightening to a style's foreground color
+/// Apply flash brightening to both foreground and background
 fn flash_style(style: Style, intensity: f32) -> Style {
     if intensity <= 0.0 {
         return style;
     }
-    let bright = Color::Rgb(255, 255, 230);
-    if let Some(fg) = style.fg {
-        Style { fg: Some(lerp_color(fg, bright, intensity * 0.5)), ..style }
-    } else {
-        style
+    let bright_fg = Color::Rgb(255, 255, 230);
+    let bright_bg = Color::Rgb(80, 72, 40);
+    let mut s = style;
+    if let Some(fg) = s.fg {
+        s.fg = Some(lerp_color(fg, bright_fg, intensity * 0.6));
     }
+    if let Some(bg) = s.bg {
+        s.bg = Some(lerp_color(bg, bright_bg, intensity * 0.7));
+    }
+    s
 }
 
 fn draw_verses(f: &mut Frame, app: &mut App, area: Rect) {
