@@ -36,15 +36,22 @@ fn handle_normal(app: &mut App, key: KeyEvent, visible_lines: usize) {
         }
         KeyCode::Char('G') => app.goto_last(),
 
+        KeyCode::Char('L') => {
+            app.half_page_down(visible_lines);
+        }
         KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
             app.half_page_down(visible_lines);
+        }
+
+        KeyCode::Char('H') => {
+            app.half_page_up(visible_lines);
         }
         KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
             app.half_page_up(visible_lines);
         }
 
-        KeyCode::Char('l') | KeyCode::Tab => app.next_chapter(),
-        KeyCode::Char('h') | KeyCode::BackTab => app.prev_chapter(),
+        KeyCode::Char('l') | KeyCode::Right | KeyCode::Tab => app.next_chapter(),
+        KeyCode::Char('h') | KeyCode::Left  | KeyCode::BackTab => app.prev_chapter(),
 
         KeyCode::Char('v') => app.enter_visual(),
         KeyCode::Enter => app.toggle_highlight(),
