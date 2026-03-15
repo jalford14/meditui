@@ -1,3 +1,6 @@
+use std::fs;
+use std::path::PathBuf;
+
 use crate::animation::AnimationState;
 use crate::bible::Bible;
 use crate::highlight::Highlights;
@@ -28,10 +31,20 @@ pub struct App {
     pub theme: Theme,
     pub show_help: bool,
     pub anim: AnimationState,
+    pub data_dir: PathBuf,
+    pub translation: String,
+    pub available_translations: Vec<String>,
 }
 
 impl App {
-    pub fn new(bible: Bible, plan: Plan, highlights: Highlights) -> App {
+    pub fn new(
+        bible: Bible,
+        plan: Plan,
+        highlights: Highlights,
+        data_dir: PathBuf,
+        translation: String,
+        available_translations: Vec<String>,
+    ) -> App {
         let day = crate::plan::day_of_year();
         let date_string = crate::plan::today_date_string();
         let today_chapters = plan.chapters_for_day(day);
@@ -54,6 +67,9 @@ impl App {
             theme,
             show_help: false,
             anim: AnimationState::new(),
+            data_dir,
+            translation,
+            available_translations,
         }
     }
 
@@ -64,6 +80,34 @@ impl App {
 
     pub fn toggle_help(&mut self) {
         self.show_help = !self.show_help;
+    }
+
+    pub fn cycle_translation(&mut self) {
+        if self.available_translations.len() <= 1 {
+            return;
+        }
+        let idx = self
+            .available_translations
+            .iter()
+            .position(|t| t == &self.translation)
+            .unwrap_or(0);
+        let next = (idx + 1) % self.available_translations.len();
+        self.translation = self.available_translations[next].clone();
+        save_translation(&self.translation);
+
+        // Reload bible data for the new translation
+        let chapter_refs: Vec<(String, u16)> = self
+            .today_chapters
+            .iter()
+            .map(|ch| (ch.book.clone(), ch.chapter))
+            .collect();
+        self.bible = Bible::load_chapters(&self.data_dir, &self.translation, &chapter_refs);
+
+        // Reset view state
+        self.cursor_verse = 0;
+        self.scroll_offset = 0;
+        self.mode = Mode::Normal;
+        self.anim.start_fade();
     }
 
     pub fn active_chapter(&self) -> Option<&ChapterRef> {
@@ -192,4 +236,49 @@ impl App {
             }
         }
     }
+}
+
+// -- Translation config persistence --
+
+fn config_path() -> Option<PathBuf> {
+    dirs::config_dir().map(|d| d.join("bible-tui").join("translation"))
+}
+
+pub fn load_translation() -> String {
+    let Some(path) = config_path() else {
+        return "kjv".to_string();
+    };
+    match fs::read_to_string(path) {
+        Ok(s) => {
+            let t = s.trim().to_string();
+            if t.is_empty() { "kjv".to_string() } else { t }
+        }
+        Err(_) => "kjv".to_string(),
+    }
+}
+
+fn save_translation(translation: &str) {
+    let Some(path) = config_path() else {
+        return;
+    };
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let _ = fs::write(path, translation);
+}
+
+/// Discover available translations by scanning subdirectories of data_dir.
+pub fn discover_translations(data_dir: &std::path::Path) -> Vec<String> {
+    let mut translations = Vec::new();
+    if let Ok(entries) = fs::read_dir(data_dir) {
+        for entry in entries.flatten() {
+            if entry.path().is_dir() {
+                if let Some(name) = entry.file_name().to_str() {
+                    translations.push(name.to_string());
+                }
+            }
+        }
+    }
+    translations.sort();
+    translations
 }

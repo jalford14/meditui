@@ -40,7 +40,12 @@ fn draw_header(f: &mut Frame, app: &App, area: Rect) {
     let theme = app.theme;
     let w = area.width as usize;
 
-    let day_label = format!("  Day {} \u{00b7} {}", app.day, app.date_string);
+    let day_label = format!(
+        "  Day {} \u{00b7} {} \u{00b7} {}",
+        app.day,
+        app.date_string,
+        app.translation.to_uppercase()
+    );
 
     let mut nav_spans: Vec<Span> = Vec::new();
     for (i, ch) in app.today_chapters.iter().enumerate() {
@@ -360,7 +365,7 @@ fn draw_help_overlay(f: &mut Frame, app: &App, area: Rect) {
     let theme = app.theme;
 
     let popup_width = 52u16.min(area.width.saturating_sub(4));
-    let popup_height = 18u16.min(area.height.saturating_sub(2));
+    let popup_height = 19u16.min(area.height.saturating_sub(2));
     let x = area.x + (area.width.saturating_sub(popup_width)) / 2;
     let y = area.y + (area.height.saturating_sub(popup_height)) / 2;
     let popup_area = Rect::new(x, y, popup_width, popup_height);
@@ -411,6 +416,10 @@ fn draw_help_overlay(f: &mut Frame, app: &App, area: Rect) {
         Line::from(vec![
             Span::styled("    t           ", key),
             Span::styled("Cycle theme", desc),
+        ]),
+        Line::from(vec![
+            Span::styled("    T           ", key),
+            Span::styled("Cycle translation", desc),
         ]),
         Line::from(vec![
             Span::styled("    q           ", key),
