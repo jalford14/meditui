@@ -53,14 +53,28 @@ The KJV text (public domain) is sourced from [aruljohn/Bible-kjv](https://github
 |-----|--------|
 | `j` / `Down` | Next verse |
 | `k` / `Up` | Previous verse |
+| `H` | Jump to first visible verse |
+| `L` | Jump to last visible verse |
 | `gg` | Jump to first verse |
 | `G` | Jump to last verse |
 | `Ctrl-d` | Half page down |
 | `Ctrl-u` | Half page up |
 | `l` / `Tab` | Next chapter |
 | `h` / `Shift-Tab` | Previous chapter |
+| `a` | Open highlight archive |
+| `r` | Return to today's readings |
 | `v` | Enter visual selection mode |
 | `Enter` | Toggle highlight on current verse |
+| `q` | Quit |
+
+### Highlight archive
+
+| Key | Action |
+|-----|--------|
+| `j` / `Down` | Next highlighted reference |
+| `k` / `Up` | Previous highlighted reference |
+| `Enter` | Open selected highlighted reference |
+| `Esc` | Return to reading |
 | `q` | Quit |
 
 ### Visual mode
@@ -74,7 +88,7 @@ The KJV text (public domain) is sourced from [aruljohn/Bible-kjv](https://github
 
 ## Highlights
 
-Verse highlights persist across sessions at `~/.config/bible-tui/highlights.json`. Use `Enter` to toggle a single verse, or `v` to select a range then `y` to highlight / `d` to clear.
+Verse highlights persist across sessions at `~/.config/bible-tui/highlights.json`. Use `Enter` to toggle a single verse, or `v` to select a range then `y` to highlight / `d` to clear. Press `a` to browse highlights grouped by M'Cheyne reading day; older highlight files are grouped by the reading days that include each highlighted chapter.
 
 ## License
 

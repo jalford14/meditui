@@ -21,6 +21,7 @@ pub fn handle_key(app: &mut App, key: KeyEvent, visible_lines: usize) {
     match app.mode {
         Mode::Normal => handle_normal(app, key, visible_lines),
         Mode::Visual => handle_visual(app, key),
+        Mode::Highlights => handle_highlights(app, key),
     }
 }
 
@@ -36,27 +37,40 @@ fn handle_normal(app: &mut App, key: KeyEvent, visible_lines: usize) {
         }
         KeyCode::Char('G') => app.goto_last(),
 
-        KeyCode::Char('L') => {
-            app.half_page_down(visible_lines);
-        }
+        KeyCode::Char('L') => app.goto_visible_last(),
         KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
             app.half_page_down(visible_lines);
         }
 
-        KeyCode::Char('H') => {
-            app.half_page_up(visible_lines);
-        }
+        KeyCode::Char('H') => app.goto_visible_first(),
         KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
             app.half_page_up(visible_lines);
         }
 
         KeyCode::Char('l') | KeyCode::Right | KeyCode::Tab => app.next_chapter(),
-        KeyCode::Char('h') | KeyCode::Left  | KeyCode::BackTab => app.prev_chapter(),
+        KeyCode::Char('h') | KeyCode::Left | KeyCode::BackTab => app.prev_chapter(),
 
+        KeyCode::Char('a') => app.enter_highlights(),
+        KeyCode::Char('r') => app.goto_today(),
         KeyCode::Char('v') => app.enter_visual(),
         KeyCode::Enter => app.toggle_highlight(),
         KeyCode::Char('t') => app.cycle_theme(),
         KeyCode::Char('T') => app.cycle_translation(),
+        KeyCode::Char('?') => app.toggle_help(),
+
+        _ => {}
+    }
+}
+
+fn handle_highlights(app: &mut App, key: KeyEvent) {
+    match key.code {
+        KeyCode::Char('q') => app.should_quit = true,
+        KeyCode::Esc => app.exit_highlights(),
+
+        KeyCode::Char('j') | KeyCode::Down => app.highlight_cursor_down(),
+        KeyCode::Char('k') | KeyCode::Up => app.highlight_cursor_up(),
+        KeyCode::Enter => app.open_selected_highlight(),
+
         KeyCode::Char('?') => app.toggle_help(),
 
         _ => {}

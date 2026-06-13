@@ -1,4 +1,6 @@
-use chrono::Datelike;
+use chrono::{Datelike, NaiveDate};
+
+pub const DAY_COUNT: u16 = 365;
 
 #[derive(Clone, Debug)]
 pub struct ChapterRef {
@@ -154,8 +156,11 @@ pub fn day_of_year() -> u16 {
     chrono::Local::now().ordinal() as u16
 }
 
-pub fn today_date_string() -> String {
-    chrono::Local::now().format("%B %-d").to_string()
+pub fn date_string_for_day(day: u16) -> String {
+    let year = chrono::Local::now().year();
+    NaiveDate::from_yo_opt(year, day as u32)
+        .map(|date| date.format("%B %-d").to_string())
+        .unwrap_or_else(|| format!("Day {}", day))
 }
 
 // Complete McHeyne reading plan: 365 lines, pipe-delimited
