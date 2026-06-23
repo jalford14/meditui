@@ -39,14 +39,7 @@ fn handle_normal(app: &mut App, key: KeyEvent, visible_lines: usize) {
         KeyCode::Char('L') => {
             app.half_page_down(visible_lines);
         }
-        KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-            app.half_page_down(visible_lines);
-        }
-
         KeyCode::Char('H') => {
-            app.half_page_up(visible_lines);
-        }
-        KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
             app.half_page_up(visible_lines);
         }
 

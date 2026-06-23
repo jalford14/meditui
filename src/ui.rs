@@ -394,7 +394,7 @@ fn draw_help_overlay(f: &mut Frame, app: &App, area: Rect) {
             Span::styled("First / last verse", desc),
         ]),
         Line::from(vec![
-            Span::styled("    Ctrl+d / u  ", key),
+            Span::styled("    L / H  ", key),
             Span::styled("Half-page down / up", desc),
         ]),
         Line::from(Span::styled("", bg)),

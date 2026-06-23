@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::PathBuf;
+use cli_log::info;
 
 use crate::animation::AnimationState;
 use crate::bible::Bible;
@@ -124,6 +125,8 @@ impl App {
     }
 
     pub fn cursor_down(&mut self) {
+        info!("verse_count: {}", self.verse_count());
+        info!("cursor_verse: {}", self.cursor_verse);
         let count = self.verse_count();
         if count > 0 && self.cursor_verse < count - 1 {
             self.cursor_verse += 1;
@@ -148,6 +151,7 @@ impl App {
     }
 
     pub fn half_page_down(&mut self, visible_lines: usize) {
+        info!("{}", visible_lines);
         let half = visible_lines / 2;
         let count = self.verse_count();
         if count > 0 {
@@ -156,6 +160,7 @@ impl App {
     }
 
     pub fn half_page_up(&mut self, visible_lines: usize) {
+        info!("{}", visible_lines);
         let half = visible_lines / 2;
         self.cursor_verse = self.cursor_verse.saturating_sub(half);
     }
