@@ -11,6 +11,8 @@ use std::io;
 use std::path::PathBuf;
 use std::time::Duration;
 
+use cli_log::*;
+
 use crossterm::event::{self, Event};
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
@@ -41,6 +43,7 @@ fn find_data_dir() -> PathBuf {
 }
 
 fn main() -> io::Result<()> {
+    init_cli_log!();
     let data_dir = find_data_dir();
     let reading_plan = plan::Plan::new();
     let highlights = highlight::Highlights::load();

@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fs;
 use std::path::PathBuf;
+use cli_log::info;
 
 use crate::animation::AnimationState;
 use crate::bible::Bible;
@@ -150,6 +151,8 @@ impl App {
     }
 
     pub fn cursor_down(&mut self) {
+        info!("verse_count: {}", self.verse_count());
+        info!("cursor_verse: {}", self.cursor_verse);
         let count = self.verse_count();
         if count > 0 && self.cursor_verse < count - 1 {
             self.cursor_verse += 1;
