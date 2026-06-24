@@ -130,9 +130,19 @@ impl App {
         self.today_chapters.get(self.active_chapter_idx)
     }
 
-    pub fn active_verses(&self) -> Option<&Vec<crate::bible::Verse>> {
-        self.active_chapter()
-            .and_then(|ch| self.bible.get_chapter(&ch.book, ch.chapter))
+    pub fn active_verses(&self) -> Option<Vec<crate::bible::Verse>> {
+        self.active_chapter().and_then(|ch| {
+            let all = self.bible.get_chapter(&ch.book, ch.chapter)?;
+            let filtered: Vec<crate::bible::Verse> = all
+                .iter()
+                .filter(|v| {
+                    ch.verse_start.map_or(true, |s| v.number >= s)
+                        && ch.verse_end.map_or(true, |e| v.number <= e)
+                })
+                .cloned()
+                .collect();
+            Some(filtered)
+        })
     }
 
     pub fn verse_count(&self) -> usize {

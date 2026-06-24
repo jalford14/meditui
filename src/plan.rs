@@ -6,6 +6,8 @@ pub const DAY_COUNT: u16 = 365;
 pub struct ChapterRef {
     pub book: String,
     pub chapter: u16,
+    pub verse_start: Option<u16>,
+    pub verse_end: Option<u16>,
 }
 
 pub struct Plan {
@@ -27,10 +29,10 @@ impl Plan {
 
             for part in parts.iter() {
                 let refs = parse_reference(part.trim());
-                for (book, ch) in refs {
+                for ch_ref in refs {
                     chapters.push(ChapterRef {
-                        book: normalize_book_name(&book),
-                        chapter: ch,
+                        book: normalize_book_name(&ch_ref.book),
+                        ..ch_ref
                     });
                 }
             }
@@ -55,9 +57,8 @@ fn normalize_book_name(name: &str) -> String {
 }
 
 /// Parse a reference like "Genesis 1", "Genesis 9-10", "Luke 1:1-38",
-/// "Exodus 11:1-12:21", "Jeremiah 36,45" into (book, chapter) pairs.
-fn parse_reference(reference: &str) -> Vec<(String, u16)> {
-    // Split book name from chapter spec at the last space before a digit
+/// "Exodus 11:1-12:21", "Jeremiah 36,45" into ChapterRefs.
+fn parse_reference(reference: &str) -> Vec<ChapterRef> {
     let (book, spec) = split_book_and_spec(reference);
 
     if spec.is_empty() {
@@ -69,7 +70,7 @@ fn parse_reference(reference: &str) -> Vec<(String, u16)> {
         return spec
             .split(',')
             .filter_map(|s| s.trim().parse::<u16>().ok())
-            .map(|ch| (book.clone(), ch))
+            .map(|ch| ChapterRef { book: book.clone(), chapter: ch, verse_start: None, verse_end: None })
             .collect();
     }
 
@@ -83,51 +84,60 @@ fn parse_reference(reference: &str) -> Vec<(String, u16)> {
         let parts: Vec<&str> = spec.split('-').collect();
         if parts.len() == 2 {
             if let (Ok(start), Ok(end)) = (parts[0].parse::<u16>(), parts[1].parse::<u16>()) {
-                return (start..=end).map(|ch| (book.clone(), ch)).collect();
+                return (start..=end)
+                    .map(|ch| ChapterRef { book: book.clone(), chapter: ch, verse_start: None, verse_end: None })
+                    .collect();
             }
         }
     }
 
     // Simple single chapter
     if let Ok(ch) = spec.parse::<u16>() {
-        return vec![(book, ch)];
+        return vec![ChapterRef { book, chapter: ch, verse_start: None, verse_end: None }];
     }
 
     vec![]
 }
 
 /// Parse verse references like "1:1-38", "11:1-12:21", "119:1-24"
-fn parse_verse_reference(book: &str, spec: &str) -> Vec<(String, u16)> {
-    // Split on "-" to get range parts
-    let parts: Vec<&str> = spec.split('-').collect();
+fn parse_verse_reference(book: &str, spec: &str) -> Vec<ChapterRef> {
+    let parts: Vec<&str> = spec.splitn(2, '-').collect();
 
-    let mut chapters = Vec::new();
-    let mut seen = std::collections::HashSet::new();
+    let (start_ch, start_v) = parse_ch_v(parts[0]);
+    let start_ch = match start_ch {
+        Some(c) => c,
+        None => return vec![],
+    };
 
-    for part in &parts {
-        if part.contains(':') {
-            // Extract chapter number before the colon
-            if let Some(ch_str) = part.split(':').next() {
-                if let Ok(ch) = ch_str.parse::<u16>() {
-                    if seen.insert(ch) {
-                        chapters.push((book.to_string(), ch));
-                    }
-                }
-            }
-        }
-        // Parts without colon are verse numbers — skip them
+    if parts.len() == 1 {
+        return vec![ChapterRef { book: book.to_string(), chapter: start_ch, verse_start: start_v, verse_end: None }];
     }
 
-    // If we found no chapters (shouldn't happen), fall back
-    if chapters.is_empty() {
-        if let Some(ch_str) = spec.split(':').next() {
-            if let Ok(ch) = ch_str.parse::<u16>() {
-                chapters.push((book.to_string(), ch));
-            }
-        }
+    let end = parts[1];
+    if end.contains(':') {
+        // Cross-chapter range: "11:1-12:21"
+        let (end_ch, end_v) = parse_ch_v(end);
+        let end_ch = match end_ch { Some(c) => c, None => return vec![] };
+        (start_ch..=end_ch)
+            .map(|ch| ChapterRef {
+                book: book.to_string(),
+                chapter: ch,
+                verse_start: if ch == start_ch { start_v } else { None },
+                verse_end: if ch == end_ch { end_v } else { None },
+            })
+            .collect()
+    } else {
+        // Same-chapter range: "119:1-24"
+        let end_v = end.parse::<u16>().ok();
+        vec![ChapterRef { book: book.to_string(), chapter: start_ch, verse_start: start_v, verse_end: end_v }]
     }
+}
 
-    chapters
+fn parse_ch_v(s: &str) -> (Option<u16>, Option<u16>) {
+    let mut it = s.splitn(2, ':');
+    let ch = it.next().and_then(|c| c.parse().ok());
+    let v = it.next().and_then(|v| v.parse().ok());
+    (ch, v)
 }
 
 /// Split "1 Samuel 29-30" into ("1 Samuel", "29-30")

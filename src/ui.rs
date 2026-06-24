@@ -86,7 +86,11 @@ fn draw_header(f: &mut Frame, app: &App, area: Rect) {
         if i > 0 {
             nav_spans.push(Span::styled("  \u{00b7}  ", theme.header_separator_style()));
         }
-        let label = format!("{} {}", ch.book, ch.chapter);
+        let label = match (ch.verse_start, ch.verse_end) {
+            (Some(s), Some(e)) => format!("{} {}:{}-{}", ch.book, ch.chapter, s, e),
+            (None, Some(e)) => format!("{} {}:1-{}", ch.book, ch.chapter, e),
+            _ => format!("{} {}", ch.book, ch.chapter),
+        };
         if i == app.active_chapter_idx {
             nav_spans.push(Span::styled(label, theme.header_chapter_active()));
         } else {
@@ -275,9 +279,11 @@ fn draw_verses(f: &mut Frame, app: &mut App, area: Rect) {
     };
     let ch_book = ch_ref.book.clone();
     let ch_chapter = ch_ref.chapter;
+    let ch_verse_start = ch_ref.verse_start;
+    let ch_verse_end = ch_ref.verse_end;
 
     let verses = match app.active_verses() {
-        Some(v) => v.clone(),
+        Some(v) => v,
         None => {
             app.set_visible_verse_range(None);
             let msg = Paragraph::new(format!("  Chapter not found: {} {}", ch_book, ch_chapter))
@@ -312,7 +318,11 @@ fn draw_verses(f: &mut Frame, app: &mut App, area: Rect) {
     let mut verse_start: Vec<usize> = Vec::new();
 
     // Chapter title (centered, with fade)
-    let title = format!("{} {}", ch_book, ch_chapter);
+    let title = match (ch_verse_start, ch_verse_end) {
+        (Some(s), Some(e)) => format!("{} {}:{}-{}", ch_book, ch_chapter, s, e),
+        (None, Some(e)) => format!("{} {}:1-{}", ch_book, ch_chapter, e),
+        _ => format!("{} {}", ch_book, ch_chapter),
+    };
     let title_len = title.chars().count();
     let left_pad = w.saturating_sub(title_len) / 2;
     let right_pad = w.saturating_sub(left_pad + title_len);
