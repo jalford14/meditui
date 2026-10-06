@@ -3,6 +3,9 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use crate::app::{App, Mode};
 
 pub fn handle_key(app: &mut App, key: KeyEvent, visible_lines: usize) {
+    if key.kind == crossterm::event::KeyEventKind::Release {
+        return;
+    }
     // Any key dismisses help overlay
     if app.show_help {
         app.show_help = false;
@@ -22,6 +25,19 @@ pub fn handle_key(app: &mut App, key: KeyEvent, visible_lines: usize) {
         Mode::Normal => handle_normal(app, key, visible_lines),
         Mode::Visual => handle_visual(app, key),
         Mode::Highlights => handle_highlights(app, key),
+        Mode::Notes => match key.code {
+            KeyCode::Esc => app.mode = Mode::Normal,
+            KeyCode::Char('q') => app.should_quit = true,
+            KeyCode::Char('j') | KeyCode::Down => {
+                app.notes_scroll = (app.notes_scroll + 1).min(app.notes_max_scroll)
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                app.notes_scroll = app.notes_scroll.saturating_sub(1)
+            }
+            KeyCode::Char('?') => app.toggle_help(),
+            _ => {}
+        },
+        Mode::NoteEditor => handle_note_editor(app, key),
     }
 }
 
@@ -51,6 +67,8 @@ fn handle_normal(app: &mut App, key: KeyEvent, visible_lines: usize) {
         KeyCode::Char('h') | KeyCode::Left | KeyCode::BackTab => app.prev_chapter(),
 
         KeyCode::Char('a') => app.enter_highlights(),
+        KeyCode::Char('n') => app.begin_note(),
+        KeyCode::Char('N') => app.enter_notes(),
         KeyCode::Char('r') => app.goto_today(),
         KeyCode::Char('v') => app.enter_visual(),
         KeyCode::Enter => app.toggle_highlight(),
@@ -70,6 +88,13 @@ fn handle_highlights(app: &mut App, key: KeyEvent) {
         KeyCode::Char('j') | KeyCode::Down => app.highlight_cursor_down(),
         KeyCode::Char('k') | KeyCode::Up => app.highlight_cursor_up(),
         KeyCode::Enter => app.open_selected_highlight(),
+        KeyCode::Char('n') => {
+            if !app.highlight_items().is_empty() {
+                app.open_selected_highlight();
+                app.begin_note();
+            }
+        }
+        KeyCode::Char('N') => app.enter_notes(),
 
         KeyCode::Char('?') => app.toggle_help(),
 
@@ -84,10 +109,39 @@ fn handle_visual(app: &mut App, key: KeyEvent) {
 
         KeyCode::Char('y') => app.highlight_selection(),
         KeyCode::Char('d') => app.unhighlight_selection(),
+        KeyCode::Char('n') => app.begin_note(),
+        KeyCode::Char('N') => app.enter_notes(),
 
         KeyCode::Esc => app.cancel_visual(),
         KeyCode::Char('?') => app.toggle_help(),
 
+        _ => {}
+    }
+}
+
+fn handle_note_editor(app: &mut App, key: KeyEvent) {
+    match key.code {
+        KeyCode::Esc => app.cancel_note(),
+        KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => app.save_note(),
+        KeyCode::Backspace => {
+            if let Some(note) = &mut app.note_draft {
+                note.text.pop();
+            }
+        }
+        KeyCode::Enter => {
+            if let Some(note) = &mut app.note_draft {
+                note.text.push('\n');
+            }
+        }
+        KeyCode::Char(c)
+            if !key
+                .modifiers
+                .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
+        {
+            if let Some(note) = &mut app.note_draft {
+                note.text.push(c);
+            }
+        }
         _ => {}
     }
 }

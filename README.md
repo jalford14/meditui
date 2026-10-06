@@ -65,6 +65,8 @@ The KJV text (public domain) is sourced from [aruljohn/Bible-kjv](https://github
 | `r` | Return to today's readings |
 | `v` | Enter visual selection mode |
 | `Enter` | Toggle highlight on current verse |
+| `n` | Write a note and highlight the current verse |
+| `N` | View all notes |
 | `q` | Quit |
 
 ### Highlight archive
@@ -74,6 +76,8 @@ The KJV text (public domain) is sourced from [aruljohn/Bible-kjv](https://github
 | `j` / `Down` | Next highlighted reference |
 | `k` / `Up` | Previous highlighted reference |
 | `Enter` | Open selected highlighted reference |
+| `n` | Write a note for the first verse of the selected reference |
+| `N` | View all notes |
 | `Esc` | Return to reading |
 | `q` | Quit |
 
@@ -84,11 +88,21 @@ The KJV text (public domain) is sourced from [aruljohn/Bible-kjv](https://github
 | `j` / `k` | Extend selection |
 | `y` | Highlight selected verses (yellow) |
 | `d` | Remove highlight from selection |
+| `n` | Write a note and highlight selected verses |
+| `N` | View all notes |
 | `Esc` | Cancel selection |
 
 ## Highlights
 
 Verse highlights persist across sessions at `~/.config/bible-tui/highlights.json`. Use `Enter` to toggle a single verse, or `v` to select a range then `y` to highlight / `d` to clear. Press `a` to browse highlights grouped by M'Cheyne reading day; older highlight files are grouped by the reading days that include each highlighted chapter.
+
+## Notes
+
+Press `n` on a verse, or select a range with `v` then press `n`. Type your note, use `Enter` for a new line, and press `Ctrl-s` to save or `Esc` to cancel. Saving also highlights the verses. Verse numbers with notes are underlined.
+
+Press `N` while reading, selecting verses, or browsing highlights to view all notes, newest first. Each entry shows its verse reference and creation date in `dd/mm/yyyy` format. Use `j`/`k` or the arrow keys to scroll and `Esc` to return to reading. Notes remain available even if you remove a highlight.
+
+Notes persist in `notes.json` beside the highlights file, in the platform's config directory under `bible-tui` (`~/Library/Application Support/bible-tui` on macOS, usually `~/.config/bible-tui` on Linux).
 
 ## License
 

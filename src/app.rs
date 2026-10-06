@@ -1,11 +1,12 @@
+use cli_log::info;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fs;
 use std::path::PathBuf;
-use cli_log::info;
 
 use crate::animation::AnimationState;
 use crate::bible::Bible;
 use crate::highlight::Highlights;
+use crate::notes::{Note, Notes};
 use crate::plan::{ChapterRef, Plan};
 use crate::theme::Theme;
 
@@ -14,6 +15,8 @@ pub enum Mode {
     Normal,
     Visual,
     Highlights,
+    Notes,
+    NoteEditor,
 }
 
 #[derive(Clone, Debug)]
@@ -28,6 +31,12 @@ pub struct App {
     pub bible: Bible,
     pub plan: Plan,
     pub highlights: Highlights,
+    pub notes: Notes,
+    pub note_draft: Option<Note>,
+    pub note_error: Option<String>,
+    pub notes_scroll: usize,
+    pub notes_max_scroll: usize,
+    pub note_return_mode: Mode,
     pub today_chapters: Vec<ChapterRef>,
     pub active_chapter_idx: usize,
     pub cursor_verse: usize,
@@ -54,6 +63,7 @@ impl App {
         bible: Bible,
         plan: Plan,
         highlights: Highlights,
+        notes: Notes,
         data_dir: PathBuf,
         translation: String,
         available_translations: Vec<String>,
@@ -67,6 +77,12 @@ impl App {
             bible,
             plan,
             highlights,
+            notes,
+            note_draft: None,
+            note_error: None,
+            notes_scroll: 0,
+            notes_max_scroll: 0,
+            note_return_mode: Mode::Normal,
             today_chapters,
             active_chapter_idx: 0,
             cursor_verse: 0,
@@ -262,6 +278,70 @@ impl App {
     pub fn enter_visual(&mut self) {
         self.mode = Mode::Visual;
         self.visual_anchor = self.cursor_verse;
+    }
+
+    pub fn enter_notes(&mut self) {
+        self.mode = Mode::Notes;
+        self.pending_g = false;
+    }
+
+    pub fn begin_note(&mut self) {
+        let Some(ch) = self.active_chapter().cloned() else {
+            return;
+        };
+        let Some(verses) = self.active_verses() else {
+            return;
+        };
+        let (start, end) = if self.mode == Mode::Visual {
+            self.visual_range()
+        } else {
+            (self.cursor_verse, self.cursor_verse)
+        };
+        let Some(selected) = verses.get(start..=end) else {
+            return;
+        };
+        if selected.is_empty() {
+            return;
+        }
+        self.note_draft = Some(Note {
+            book: ch.book,
+            chapter: ch.chapter,
+            verses: selected.iter().map(|verse| verse.number).collect(),
+            date: chrono::Local::now().format("%d/%m/%Y").to_string(),
+            text: String::new(),
+        });
+        self.note_error = None;
+        self.note_return_mode = self.mode;
+        self.mode = Mode::NoteEditor;
+    }
+
+    pub fn cancel_note(&mut self) {
+        self.note_draft = None;
+        self.note_error = None;
+        self.mode = self.note_return_mode;
+    }
+
+    pub fn save_note(&mut self) {
+        let Some(mut note) = self.note_draft.clone() else {
+            return;
+        };
+        note.text = note.text.trim().to_string();
+        if note.text.is_empty() {
+            self.note_error = Some("Write a note before saving.".to_string());
+            return;
+        }
+        self.notes.entries.push(note.clone());
+        if let Err(error) = self.notes.save() {
+            self.notes.entries.pop();
+            self.note_error = Some(format!("Could not save note: {error}"));
+            return;
+        }
+        self.highlights
+            .highlight_range_for_day(&note.book, note.chapter, &note.verses, self.day);
+        self.highlights.save();
+        self.note_draft = None;
+        self.note_error = None;
+        self.mode = Mode::Normal;
     }
 
     pub fn cancel_visual(&mut self) {
@@ -494,4 +574,103 @@ pub fn discover_translations(data_dir: &std::path::Path) -> Vec<String> {
     }
     translations.sort();
     translations
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    use ratatui::{backend::TestBackend, Terminal};
+
+    #[test]
+    fn dated_notes_selection_persistence_and_failed_save() {
+        let directory = std::env::temp_dir().join(format!(
+            "meditui-notes-{}-{}",
+            std::process::id(),
+            chrono::Local::now().timestamp_nanos_opt().unwrap()
+        ));
+        let path = directory.join("notes.json");
+        let data_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("data");
+        let mut app = App::new(
+            Bible::load_chapters(&data_dir, "kjv", &[]),
+            Plan::new(),
+            Highlights::default(),
+            Notes::load_from(path.clone()).unwrap(),
+            data_dir,
+            "kjv".to_string(),
+            vec!["kjv".to_string()],
+        );
+        let day = (1..=crate::plan::DAY_COUNT)
+            .find(|&day| {
+                app.plan
+                    .chapters_for_day(day)
+                    .iter()
+                    .any(|ch| ch.book == "Luke" && ch.verse_start == Some(39))
+            })
+            .unwrap();
+        app.load_day(day); // Luke 1:39-80: indexes differ from verse numbers.
+        app.active_chapter_idx = app
+            .today_chapters
+            .iter()
+            .position(|ch| ch.book == "Luke")
+            .unwrap();
+        let key = |code, modifiers| KeyEvent::new(code, modifiers);
+        crate::keys::handle_key(&mut app, key(KeyCode::Char('v'), KeyModifiers::NONE), 20);
+        app.cursor_down();
+        crate::keys::handle_key(&mut app, key(KeyCode::Char('n'), KeyModifiers::NONE), 20);
+        assert_eq!(app.note_draft.as_ref().unwrap().verses, vec![39, 40]);
+        assert_eq!(
+            app.note_draft.as_ref().unwrap().date,
+            chrono::Local::now().format("%d/%m/%Y").to_string()
+        );
+        app.save_note();
+        assert!(app.note_error.is_some());
+        assert!(app.notes.entries.is_empty());
+        for c in "Reflection: café? q".chars() {
+            crate::keys::handle_key(&mut app, key(KeyCode::Char(c), KeyModifiers::NONE), 20);
+        }
+        assert!(!app.should_quit);
+        crate::keys::handle_key(&mut app, key(KeyCode::Enter, KeyModifiers::NONE), 20);
+        crate::keys::handle_key(&mut app, key(KeyCode::Char('é'), KeyModifiers::NONE), 20);
+        crate::keys::handle_key(&mut app, key(KeyCode::Backspace, KeyModifiers::NONE), 20);
+        let mut terminal = Terminal::new(TestBackend::new(80, 12)).unwrap();
+        terminal
+            .draw(|frame| crate::ui::draw(frame, &mut app))
+            .unwrap();
+        // Simulate an unwritable destination without touching the real config.
+        fs::create_dir_all(&directory).unwrap();
+        fs::create_dir(&path).unwrap();
+        app.save_note();
+        assert!(app.mode == Mode::NoteEditor);
+        assert!(app.note_error.as_ref().unwrap().contains("Could not save"));
+        assert!(app.notes.entries.is_empty());
+        assert!(app.note_draft.as_ref().unwrap().text.contains("café"));
+        fs::remove_dir(&path).unwrap();
+        // Save notes directly here so the test never writes real highlight config.
+        let note = app.note_draft.clone().unwrap();
+        app.notes.entries.push(note);
+        app.notes.save().unwrap();
+        let loaded = Notes::load_from(path.clone()).unwrap();
+        assert_eq!(loaded.entries[0].verses, vec![39, 40]);
+        assert_eq!(loaded.entries[0].text, "Reflection: café? q\n");
+        app.cancel_note();
+        assert!(app.mode == Mode::Visual);
+        app.enter_notes();
+        terminal
+            .draw(|frame| crate::ui::draw(frame, &mut app))
+            .unwrap();
+        let rendered: String = terminal
+            .backend()
+            .buffer()
+            .content
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect();
+        assert!(rendered.contains("Luke 1:39-40"));
+        assert!(rendered.contains(&loaded.entries[0].date));
+        assert!(rendered.contains("Reflection: café? q"));
+        fs::write(&path, "invalid JSON").unwrap();
+        assert!(Notes::load_from(path).is_err());
+        fs::remove_dir_all(directory).unwrap();
+    }
 }

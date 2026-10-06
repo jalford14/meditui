@@ -3,6 +3,7 @@ mod app;
 mod bible;
 mod highlight;
 mod keys;
+mod notes;
 mod plan;
 mod theme;
 mod ui;
@@ -14,10 +15,10 @@ use std::time::Duration;
 use cli_log::*;
 
 use crossterm::event::{self, Event};
+use crossterm::execute;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
-use crossterm::execute;
 use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
 
@@ -47,6 +48,7 @@ fn main() -> io::Result<()> {
     let data_dir = find_data_dir();
     let reading_plan = plan::Plan::new();
     let highlights = highlight::Highlights::load();
+    let notes = notes::Notes::load()?;
 
     // Discover available translations
     let available = app::discover_translations(&data_dir);
@@ -66,7 +68,15 @@ fn main() -> io::Result<()> {
         .collect();
     let bible = bible::Bible::load_chapters(&data_dir, &translation, &chapter_refs);
 
-    let mut app = app::App::new(bible, reading_plan, highlights, data_dir, translation, available);
+    let mut app = app::App::new(
+        bible,
+        reading_plan,
+        highlights,
+        notes,
+        data_dir,
+        translation,
+        available,
+    );
 
     // Setup terminal
     enable_raw_mode()?;

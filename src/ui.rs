@@ -26,10 +26,11 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     .split(area);
 
     draw_header(f, app, chunks[0]);
-    if app.mode == Mode::Highlights {
-        draw_highlights(f, app, chunks[1]);
-    } else {
-        draw_verses(f, app, chunks[1]);
+    match app.mode {
+        Mode::Highlights => draw_highlights(f, app, chunks[1]),
+        Mode::Notes => draw_notes(f, app, chunks[1]),
+        Mode::NoteEditor => draw_note_editor(f, app, chunks[1]),
+        _ => draw_verses(f, app, chunks[1]),
     }
     draw_status(f, app, chunks[2]);
 
@@ -43,6 +44,15 @@ pub fn draw(f: &mut Frame, app: &mut App) {
 fn draw_header(f: &mut Frame, app: &App, area: Rect) {
     let theme = app.theme;
     let w = area.width as usize;
+
+    if app.mode == Mode::Notes {
+        f.render_widget(
+            Paragraph::new(format!("  All notes ({} entries)", app.notes.entries.len()))
+                .style(theme.header_chapter_active()),
+            area,
+        );
+        return;
+    }
 
     if app.mode == Mode::Highlights {
         let items = app.highlight_items();
@@ -346,6 +356,13 @@ fn draw_verses(f: &mut Frame, app: &mut App, area: Rect) {
 
         let (mut num_style, mut text_style) =
             theme.verse_styles(is_cursor, is_highlighted, is_visual);
+        if app.notes.entries.iter().any(|note| {
+            note.book == ch_book
+                && note.chapter == ch_chapter
+                && note.verses.contains(&verse.number)
+        }) {
+            num_style = num_style.add_modifier(ratatui::style::Modifier::UNDERLINED);
+        }
 
         // Chapter fade-in
         if fade < 1.0 {
@@ -517,6 +534,65 @@ fn highlight_item_line(
 
 // ── Status bar ──
 
+fn note_reference(note: &crate::notes::Note) -> String {
+    format!(
+        "{} {}:{} — {}",
+        note.book,
+        note.chapter,
+        format_verse_ranges(&note.verses),
+        note.date
+    )
+}
+
+fn draw_notes(f: &mut Frame, app: &mut App, area: Rect) {
+    let mut lines = Vec::new();
+    for note in app.notes.entries.iter().rev() {
+        for line in word_wrap(&note_reference(note), area.width as usize) {
+            lines.push(Line::styled(line, app.theme.status_accent_style()));
+        }
+        for paragraph in note.text.split('\n') {
+            for line in word_wrap(paragraph, area.width as usize) {
+                lines.push(Line::styled(line, app.theme.bg_style()));
+            }
+        }
+        lines.push(Line::raw(""));
+    }
+    if lines.is_empty() {
+        lines.push(Line::raw(
+            "No notes yet. Press Esc, then n on a verse to write one.",
+        ));
+    }
+    app.notes_max_scroll = lines.len().saturating_sub(area.height as usize);
+    app.notes_scroll = app.notes_scroll.min(app.notes_max_scroll);
+    let visible: Vec<_> = lines
+        .into_iter()
+        .skip(app.notes_scroll)
+        .take(area.height as usize)
+        .collect();
+    f.render_widget(Paragraph::new(visible).style(app.theme.bg_style()), area);
+}
+
+fn draw_note_editor(f: &mut Frame, app: &App, area: Rect) {
+    let Some(note) = &app.note_draft else { return };
+    let chunks = Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).split(area);
+    f.render_widget(
+        Paragraph::new(note_reference(note)).style(app.theme.status_accent_style()),
+        chunks[0],
+    );
+    let text = format!("{}▏", note.text);
+    let lines: Vec<Line> = text
+        .split('\n')
+        .flat_map(|paragraph| word_wrap(paragraph, area.width as usize))
+        .map(Line::raw)
+        .collect();
+    let scroll = lines.len().saturating_sub(chunks[1].height as usize);
+    f.render_widget(
+        Paragraph::new(lines.into_iter().skip(scroll).collect::<Vec<_>>())
+            .style(app.theme.bg_style()),
+        chunks[1],
+    );
+}
+
 fn draw_status(f: &mut Frame, app: &App, area: Rect) {
     let theme = app.theme;
     let w = area.width as usize;
@@ -526,7 +602,7 @@ fn draw_status(f: &mut Frame, app: &App, area: Rect) {
             let left = if app.pending_g {
                 "  g..".to_string()
             } else {
-                "  ? help".to_string()
+                "  n:note  N:all notes  ? help".to_string()
             };
 
             let right = if app.verse_count() > 0 {
@@ -551,7 +627,7 @@ fn draw_status(f: &mut Frame, app: &App, area: Rect) {
                 count,
                 if count == 1 { "" } else { "s" }
             );
-            let right = "y:highlight  d:remove  Esc:cancel  ".to_string();
+            let right = "y:highlight  n:note  N:notes  d:remove  Esc:cancel  ".to_string();
             let spacer = w.saturating_sub(left.chars().count() + right.chars().count());
 
             vec![
@@ -567,7 +643,7 @@ fn draw_status(f: &mut Frame, app: &App, area: Rect) {
             } else {
                 format!("  HIGHLIGHTS  {} of {}", app.highlight_cursor + 1, count)
             };
-            let right = "Enter:open  j/k:move  Esc:back  ".to_string();
+            let right = "Enter:open  n:note  N:notes  j/k:move  Esc:back  ".to_string();
             let spacer = w.saturating_sub(left.chars().count() + right.chars().count());
 
             vec![
@@ -576,6 +652,16 @@ fn draw_status(f: &mut Frame, app: &App, area: Rect) {
                 Span::styled(right, theme.status_style()),
             ]
         }
+        Mode::Notes => vec![Span::styled(
+            "  NOTES  j/k:scroll  Esc:back  q:quit",
+            theme.status_style(),
+        )],
+        Mode::NoteEditor => vec![Span::styled(
+            app.note_error.clone().unwrap_or_else(|| {
+                "  NOTE  Ctrl-s:save  Enter:new line  Backspace:erase  Esc:cancel".to_string()
+            }),
+            theme.status_accent_style(),
+        )],
     };
 
     let line = Line::from(spans);
@@ -589,7 +675,7 @@ fn draw_help_overlay(f: &mut Frame, app: &App, area: Rect) {
     let theme = app.theme;
 
     let popup_width = 52u16.min(area.width.saturating_sub(4));
-    let popup_height = 22u16.min(area.height.saturating_sub(2));
+    let popup_height = 24u16.min(area.height.saturating_sub(2));
     let x = area.x + (area.width.saturating_sub(popup_width)) / 2;
     let y = area.y + (area.height.saturating_sub(popup_height)) / 2;
     let popup_area = Rect::new(x, y, popup_width, popup_height);
@@ -643,6 +729,14 @@ fn draw_help_overlay(f: &mut Frame, app: &App, area: Rect) {
         Line::from(vec![
             Span::styled("    a           ", key),
             Span::styled("Highlight archive", desc),
+        ]),
+        Line::from(vec![
+            Span::styled("    n           ", key),
+            Span::styled("Note verse / visual selection", desc),
+        ]),
+        Line::from(vec![
+            Span::styled("    N           ", key),
+            Span::styled("All dated notes", desc),
         ]),
         Line::from(Span::styled("", bg)),
         Line::from(vec![
